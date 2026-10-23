@@ -3,7 +3,7 @@
 Local development environment for GRaCe-GRC: one Docker Compose setup with the databases and the
 services.
 
-> **Status:** PostgreSQL, the Regulatory API, the regulatory ingestion service and the admin console service. More services are added in later stories. No SQS, SNS or S3 yet.
+> **Status:** PostgreSQL, the Regulatory API, the regulatory ingestion service, the admin console service and the admin console UI. No SQS, SNS or S3 yet.
 
 ## Layout
 
@@ -17,7 +17,7 @@ services.
 
 ## Prerequisites
 - Docker with Docker Compose v2 (`docker compose version`)
-- Ports `5432`, `8080`, `8081` and `8082` free, or other ports set in `compose/.env`
+- Ports `5432`, `8080`, `8081`, `8082` and `4200` free, or other ports set in `compose/.env`
 
 ## Start and stop
 Run every command from the `compose` folder:
@@ -39,6 +39,7 @@ docker compose down
 | `regulatory-api` | `ghcr.io/grace-grc/regulatory-api` | `8080` | `postgres` (healthy) |
 | `regulatory-ingestion-service` | `ghcr.io/grace-grc/regulatory-ingestion-service` | `8081` | `regulatory-api` (healthy), called at `http://regulatory-api:8080` |
 | `admin-console-service` | `ghcr.io/grace-grc/admin-console-service` | `8082` | `regulatory-ingestion-service` (healthy), called at `http://regulatory-ingestion-service:8080` |
+| `admin-console-ui` | `ghcr.io/grace-grc/admin-console-ui` | `4200` | `admin-console-service` (healthy); nginx sends `/api` to `http://admin-console-service:8080` |
 
 ```bash
 curl -i -H 'Content-Type: application/json' \
@@ -59,6 +60,19 @@ curl http://localhost:8082/api/dashboard/authorities
 
 It sets `createdBy` to `admin-console` and creates the authority through the ingestion service.
 
+## Walkthrough
+
+1. `docker compose up -d --wait` from `compose/`, and wait until every service is healthy.
+2. Open http://localhost:4200. It redirects to the authorities dashboard and shows the table.
+3. Fill in **Name** and **Jurisdiction** and create the authority. It appears in the table, created
+   by `admin-console`.
+4. Create it again with the same name: the form shows that the name already exists.
+5. Check the database:
+
+   ```bash
+   docker compose exec postgres psql -U postgres -d regulatory -c 'select name, jurisdiction, enabled, created_by from authorities'
+   ```
+
 The first request creates an authority through the ingestion service (`201` with a `Location`
 header); the other two read it through the ingestion service and directly from the Regulatory API.
 
@@ -71,9 +85,9 @@ docker compose up -d --wait
 ```
 
 To run a specific release, set the tag in `compose/.env` (for example `REGULATORY_API_TAG=0.1.0` or
-`REGULATORY_INGESTION_SERVICE_TAG=0.1.0`, `ADMIN_CONSOLE_SERVICE_TAG=0.1.0`).
-The published images are `linux/amd64`; on Apple silicon they run under emulation and start more
-slowly.
+`REGULATORY_INGESTION_SERVICE_TAG=0.1.0`, `ADMIN_CONSOLE_SERVICE_TAG=0.1.0`, `ADMIN_CONSOLE_UI_TAG=0.1.0`).
+The published Java images are `linux/amd64`; on Apple silicon they run under emulation and start more
+slowly. The UI image is published for `linux/amd64` and `linux/arm64`.
 
 ### Healthchecks
 The service images have no shell, `curl` or `wget`, and their Java runtime cannot run a `.java`
@@ -92,8 +106,13 @@ sandbox with the override:
 docker compose -f compose.yaml -f compose.build.yaml up -d --wait
 ```
 
-The override only changes the images to `regulatory-api:local`, `regulatory-ingestion-service:local`
-and `admin-console-service:local` and never pulls them, so build them before using it.
+The override only changes the Java services to `regulatory-api:local`, `regulatory-ingestion-service:local`
+and `admin-console-service:local` and never pulls them, so build them before using it. The UI is built
+by Compose from `../../admin-console-ui` (its `Dockerfile`) as `admin-console-ui:local`:
+
+```bash
+docker compose -f compose.yaml -f compose.build.yaml up -d --wait --build admin-console-ui
+```
 
 ## Configuration
 The defaults work without any setup. To change them, copy the example file in `compose/` and edit it:
@@ -122,6 +141,11 @@ cp .env.example .env
 | `ADMIN_CONSOLE_SERVICE_TAG` | `latest` | Admin console service image tag |
 | `ADMIN_CONSOLE_SERVICE_PORT` | `8082` | Admin console service port on your machine |
 | `ADMIN_CONSOLE_SERVICE_LOCAL_IMAGE` | `admin-console-service:local` | Image used by `compose.build.yaml` |
+| `ADMIN_CONSOLE_UI_IMAGE` | `ghcr.io/grace-grc/admin-console-ui` | Admin console UI image |
+| `ADMIN_CONSOLE_UI_TAG` | `latest` | Admin console UI image tag |
+| `ADMIN_CONSOLE_UI_PORT` | `4200` | Admin console UI port on your machine |
+| `ADMIN_CONSOLE_UI_LOCAL_IMAGE` | `admin-console-ui:local` | Image built by `compose.build.yaml` |
+| `ADMIN_CONSOLE_UI_SOURCE` | `../../admin-console-ui` | Clone that `compose.build.yaml` builds the UI from |
 
 These values are for local use only. `compose/.env` is ignored by git.
 
