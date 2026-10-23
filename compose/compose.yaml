@@ -19,5 +19,38 @@ services:
       retries: 20
       start_period: 10s
 
+  healthcheck-probe:
+    image: eclipse-temurin:${HEALTHCHECK_JDK_TAG:-25-jdk}
+    command: ["javac", "--release", "25", "-d", "/probe", "/healthcheck/HealthCheck.java"]
+    volumes:
+      - ./healthcheck:/healthcheck:ro
+      - healthcheck-probe:/probe
+    restart: "no"
+
+  regulatory-api:
+    image: ${REGULATORY_API_IMAGE:-ghcr.io/grace-grc/regulatory-api}:${REGULATORY_API_TAG:-latest}
+    environment:
+      REGULATORY_DB_HOST: postgres
+      REGULATORY_DB_PORT: 5432
+      REGULATORY_DB_NAME: regulatory
+      REGULATORY_DB_USERNAME: regulatory_api
+      REGULATORY_DB_PASSWORD: ${REGULATORY_API_DB_PASSWORD:-regulatory_api}
+    ports:
+      - "${REGULATORY_API_PORT:-8080}:8080"
+    volumes:
+      - healthcheck-probe:/healthcheck:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      healthcheck-probe:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/layers/paketo-buildpacks_bellsoft-liberica/jre/bin/java", "-cp", "/healthcheck", "HealthCheck", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 30s
+      retries: 10
+      start_period: 90s
+
 volumes:
   postgres-data:
+  healthcheck-probe:

@@ -1,21 +1,23 @@
 # GRaCe-GRC-sandbox
 
-Local development environment for GRaCe-GRC: one Docker Compose setup with the databases and,
-as they are added, the services.
+Local development environment for GRaCe-GRC: one Docker Compose setup with the databases and the
+services.
 
-> **Status:** PostgreSQL only. Services are added in later stories. No SQS, SNS or S3 yet.
+> **Status:** PostgreSQL and the Regulatory API. More services are added in later stories. No SQS, SNS or S3 yet.
 
 ## Layout
 
 | Path | Contents |
 |---|---|
 | `compose/compose.yaml` | Services of the environment |
+| `compose/compose.build.yaml` | Override that runs locally built images instead of the published ones |
 | `compose/.env.example` | Configuration defaults |
 | `compose/postgres/init/` | Scripts that create the databases and users on first start |
+| `compose/healthcheck/` | Probe used by the Java services' healthchecks |
 
 ## Prerequisites
 - Docker with Docker Compose v2 (`docker compose version`)
-- Port `5432` free, or another port set in `compose/.env`
+- Ports `5432` and `8080` free, or other ports set in `compose/.env`
 
 ## Start and stop
 Run every command from the `compose` folder:
@@ -28,6 +30,47 @@ docker compose down
 ```
 
 `--wait` returns once every service is healthy.
+
+## Services
+
+| Service | Image | Port | Depends on |
+|---|---|---|---|
+| `postgres` | `postgres:18-alpine` | `5432` | |
+| `regulatory-api` | `ghcr.io/grace-grc/regulatory-api` | `8080` | `postgres` (healthy) |
+
+```bash
+curl http://localhost:8080/actuator/health
+curl http://localhost:8080/api/v1/authorities
+```
+
+Images use the `latest` tag by default. `docker compose up` does not download a newer `latest` on
+its own, so update them first:
+
+```bash
+docker compose pull
+docker compose up -d --wait
+```
+
+To run a specific release, set the tag in `compose/.env` (for example `REGULATORY_API_TAG=0.1.0`).
+The published images are `linux/amd64`; on Apple silicon they run under emulation and start more
+slowly.
+
+### Healthchecks
+The service images have no shell, `curl` or `wget`, and their Java runtime cannot run a `.java`
+file directly. The one-shot `healthcheck-probe` service compiles `compose/healthcheck/HealthCheck.java`
+with a JDK image into a shared volume, and each Java service runs it with its own Java runtime
+against `/actuator/health`. `--wait` returns once every service is healthy.
+
+### Running a local build
+To try changes before they are released, build the image in the service repository and start the
+sandbox with the override:
+
+```bash
+(cd ../../regulatory-api && ./mvnw spring-boot:build-image -Dspring-boot.build-image.imageName=regulatory-api:local)
+docker compose -f compose.yaml -f compose.build.yaml up -d --wait
+```
+
+The override only changes the image to `regulatory-api:local` and never pulls it.
 
 ## Configuration
 The defaults work without any setup. To change them, copy the example file in `compose/` and edit it:
@@ -43,6 +86,11 @@ cp .env.example .env
 | `POSTGRES_USER` | `postgres` | Superuser |
 | `POSTGRES_PASSWORD` | `postgres` | Superuser password |
 | `REGULATORY_API_DB_PASSWORD` | `regulatory_api` | Password of the `regulatory_api` user |
+| `HEALTHCHECK_JDK_TAG` | `25-jdk` | `eclipse-temurin` image that compiles the healthcheck probe |
+| `REGULATORY_API_IMAGE` | `ghcr.io/grace-grc/regulatory-api` | Regulatory API image |
+| `REGULATORY_API_TAG` | `latest` | Regulatory API image tag |
+| `REGULATORY_API_PORT` | `8080` | Regulatory API port on your machine |
+| `REGULATORY_API_LOCAL_IMAGE` | `regulatory-api:local` | Image used by `compose.build.yaml` |
 
 These values are for local use only. `compose/.env` is ignored by git.
 
@@ -53,7 +101,8 @@ These values are for local use only. `compose/.env` is ignored by git.
 | `regulatory` | `regulatory_api` | [regulatory-api](https://github.com/GRaCe-GRC/regulatory-api) |
 
 The databases and users are created the first time PostgreSQL starts
-(`compose/postgres/init/`). Tables are created by each API's Flyway migrations, not here.
+(`compose/postgres/init/`). Tables are created by each API's Flyway migrations when the API starts,
+not here.
 
 Connect from your machine:
 
