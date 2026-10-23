@@ -3,7 +3,7 @@
 Local development environment for GRaCe-GRC: one Docker Compose setup with the databases and the
 services.
 
-> **Status:** PostgreSQL and the Regulatory API. More services are added in later stories. No SQS, SNS or S3 yet.
+> **Status:** PostgreSQL, the Regulatory API and the regulatory ingestion service. More services are added in later stories. No SQS, SNS or S3 yet.
 
 ## Layout
 
@@ -17,7 +17,7 @@ services.
 
 ## Prerequisites
 - Docker with Docker Compose v2 (`docker compose version`)
-- Ports `5432` and `8080` free, or other ports set in `compose/.env`
+- Ports `5432`, `8080` and `8081` free, or other ports set in `compose/.env`
 
 ## Start and stop
 Run every command from the `compose` folder:
@@ -37,11 +37,18 @@ docker compose down
 |---|---|---|---|
 | `postgres` | `postgres:18-alpine` | `5432` | |
 | `regulatory-api` | `ghcr.io/grace-grc/regulatory-api` | `8080` | `postgres` (healthy) |
+| `regulatory-ingestion-service` | `ghcr.io/grace-grc/regulatory-ingestion-service` | `8081` | `regulatory-api` (healthy), called at `http://regulatory-api:8080` |
 
 ```bash
-curl http://localhost:8080/actuator/health
+curl -i -H 'Content-Type: application/json' \
+  -d '{"name":"European Banking Authority","jurisdiction":"EU","createdBy":"me"}' \
+  http://localhost:8081/api/v1/authorities
+curl http://localhost:8081/api/v1/authorities
 curl http://localhost:8080/api/v1/authorities
 ```
+
+The first request creates an authority through the ingestion service (`201` with a `Location`
+header); the other two read it through the ingestion service and directly from the Regulatory API.
 
 Images use the `latest` tag by default. `docker compose up` does not download a newer `latest` on
 its own, so update them first:
@@ -51,7 +58,8 @@ docker compose pull
 docker compose up -d --wait
 ```
 
-To run a specific release, set the tag in `compose/.env` (for example `REGULATORY_API_TAG=0.1.0`).
+To run a specific release, set the tag in `compose/.env` (for example `REGULATORY_API_TAG=0.1.0` or
+`REGULATORY_INGESTION_SERVICE_TAG=0.1.0`).
 The published images are `linux/amd64`; on Apple silicon they run under emulation and start more
 slowly.
 
@@ -67,10 +75,12 @@ sandbox with the override:
 
 ```bash
 (cd ../../regulatory-api && ./mvnw spring-boot:build-image -Dspring-boot.build-image.imageName=regulatory-api:local)
+(cd ../../regulatory-ingestion-service && ./mvnw spring-boot:build-image -Dspring-boot.build-image.imageName=regulatory-ingestion-service:local)
 docker compose -f compose.yaml -f compose.build.yaml up -d --wait
 ```
 
-The override only changes the image to `regulatory-api:local` and never pulls it.
+The override only changes the images to `regulatory-api:local` and `regulatory-ingestion-service:local`
+and never pulls them, so build both before using it.
 
 ## Configuration
 The defaults work without any setup. To change them, copy the example file in `compose/` and edit it:
@@ -91,6 +101,10 @@ cp .env.example .env
 | `REGULATORY_API_TAG` | `latest` | Regulatory API image tag |
 | `REGULATORY_API_PORT` | `8080` | Regulatory API port on your machine |
 | `REGULATORY_API_LOCAL_IMAGE` | `regulatory-api:local` | Image used by `compose.build.yaml` |
+| `REGULATORY_INGESTION_SERVICE_IMAGE` | `ghcr.io/grace-grc/regulatory-ingestion-service` | Ingestion service image |
+| `REGULATORY_INGESTION_SERVICE_TAG` | `latest` | Ingestion service image tag |
+| `REGULATORY_INGESTION_SERVICE_PORT` | `8081` | Ingestion service port on your machine |
+| `REGULATORY_INGESTION_SERVICE_LOCAL_IMAGE` | `regulatory-ingestion-service:local` | Image used by `compose.build.yaml` |
 
 These values are for local use only. `compose/.env` is ignored by git.
 

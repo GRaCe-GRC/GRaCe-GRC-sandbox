@@ -2,3 +2,6 @@ services:
   regulatory-api:
     image: ${REGULATORY_API_LOCAL_IMAGE:-regulatory-api:local}
     pull_policy: never
+  regulatory-ingestion-service:
+    image: ${REGULATORY_INGESTION_SERVICE_LOCAL_IMAGE:-regulatory-ingestion-service:local}
+    pull_policy: never

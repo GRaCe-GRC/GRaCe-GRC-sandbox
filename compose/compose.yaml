@@ -51,6 +51,26 @@ services:
       retries: 10
       start_period: 90s
 
+  regulatory-ingestion-service:
+    image: ${REGULATORY_INGESTION_SERVICE_IMAGE:-ghcr.io/grace-grc/regulatory-ingestion-service}:${REGULATORY_INGESTION_SERVICE_TAG:-latest}
+    environment:
+      REGULATORY_API_URL: http://regulatory-api:8080
+    ports:
+      - "${REGULATORY_INGESTION_SERVICE_PORT:-8081}:8080"
+    volumes:
+      - healthcheck-probe:/healthcheck:ro
+    depends_on:
+      regulatory-api:
+        condition: service_healthy
+      healthcheck-probe:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/layers/paketo-buildpacks_bellsoft-liberica/jre/bin/java", "-cp", "/healthcheck", "HealthCheck", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 30s
+      retries: 10
+      start_period: 90s
+
 volumes:
   postgres-data:
   healthcheck-probe:
