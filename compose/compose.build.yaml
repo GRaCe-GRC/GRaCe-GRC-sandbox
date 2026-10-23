@@ -5,3 +5,6 @@ services:
   regulatory-ingestion-service:
     image: ${REGULATORY_INGESTION_SERVICE_LOCAL_IMAGE:-regulatory-ingestion-service:local}
     pull_policy: never
+  admin-console-service:
+    image: ${ADMIN_CONSOLE_SERVICE_LOCAL_IMAGE:-admin-console-service:local}
+    pull_policy: never
