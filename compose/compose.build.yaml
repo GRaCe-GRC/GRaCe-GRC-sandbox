@@ -1,0 +1,4 @@
+services:
+  regulatory-api:
+    image: ${REGULATORY_API_LOCAL_IMAGE:-regulatory-api:local}
+    pull_policy: never

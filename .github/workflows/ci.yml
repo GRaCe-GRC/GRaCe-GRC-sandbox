@@ -14,4 +14,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Validate compose files
-        run: docker compose -f compose/compose.yaml config --quiet
+        run: |
+          docker compose -f compose/compose.yaml config --quiet
+          docker compose -f compose/compose.yaml -f compose/compose.build.yaml config --quiet
