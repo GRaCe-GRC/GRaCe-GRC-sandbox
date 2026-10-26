@@ -7,6 +7,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       REGULATORY_API_DB_PASSWORD: ${REGULATORY_API_DB_PASSWORD:-regulatory_api}
+      CONTROL_API_DB_PASSWORD: ${CONTROL_API_DB_PASSWORD:-control_api}
+      CONTROL_MAPPING_API_DB_PASSWORD: ${CONTROL_MAPPING_API_DB_PASSWORD:-control_mapping_api}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
