@@ -128,6 +128,8 @@ cp .env.example .env
 | `POSTGRES_USER` | `postgres` | Superuser |
 | `POSTGRES_PASSWORD` | `postgres` | Superuser password |
 | `REGULATORY_API_DB_PASSWORD` | `regulatory_api` | Password of the `regulatory_api` user |
+| `CONTROL_API_DB_PASSWORD` | `control_api` | Password of the `control_api` user |
+| `CONTROL_MAPPING_API_DB_PASSWORD` | `control_mapping_api` | Password of the `control_mapping_api` user |
 | `HEALTHCHECK_JDK_TAG` | `25-jdk` | `eclipse-temurin` image that compiles the healthcheck probe |
 | `REGULATORY_API_IMAGE` | `ghcr.io/grace-grc/regulatory-api` | Regulatory API image |
 | `REGULATORY_API_TAG` | `latest` | Regulatory API image tag |
@@ -151,11 +153,16 @@ These values are for local use only. `compose/.env` is ignored by git.
 
 ## Databases
 
-| Database | Owner | Used by |
-|---|---|---|
-| `regulatory` | `regulatory_api` | [regulatory-api](https://github.com/GRaCe-GRC/regulatory-api) |
+| Database | Schema | Owner | Used by |
+|---|---|---|---|
+| `regulatory` | `public` | `regulatory_api` | [regulatory-api](https://github.com/GRaCe-GRC/regulatory-api) |
+| `controls` | `controls` | `control_api` | [control-api](https://github.com/GRaCe-GRC/control-api) |
+| `controls` | `control_mappings` | `control_mapping_api` | [control-mapping-api](https://github.com/GRaCe-GRC/control-mapping-api) |
 
-The databases and users are created the first time PostgreSQL starts
+The `controls` database is shared by two APIs, one schema each ([ADR 0006](https://github.com/GRaCe-GRC/GRaCe-GRC-docs/blob/main/adr/0006-controls-database-schemas.md)).
+Each user can only use and create tables in its own schema, and its `search_path` points to it.
+
+The databases, schemas and users are created the first time PostgreSQL starts
 (`compose/postgres/init/`). Tables are created by each API's Flyway migrations when the API starts,
 not here.
 
