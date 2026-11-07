@@ -77,6 +77,30 @@ services:
       retries: 10
       start_period: 90s
 
+  control-mapping-api:
+    image: ${CONTROL_MAPPING_API_IMAGE:-ghcr.io/grace-grc/control-mapping-api}:${CONTROL_MAPPING_API_TAG:-latest}
+    environment:
+      CONTROL_MAPPING_DB_HOST: postgres
+      CONTROL_MAPPING_DB_PORT: 5432
+      CONTROL_MAPPING_DB_NAME: controls
+      CONTROL_MAPPING_DB_USERNAME: control_mapping_api
+      CONTROL_MAPPING_DB_PASSWORD: ${CONTROL_MAPPING_API_DB_PASSWORD:-control_mapping_api}
+    ports:
+      - "${CONTROL_MAPPING_API_PORT:-8084}:8080"
+    volumes:
+      - healthcheck-probe:/healthcheck:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      healthcheck-probe:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/layers/paketo-buildpacks_bellsoft-liberica/jre/bin/java", "-cp", "/healthcheck", "HealthCheck", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 30s
+      retries: 10
+      start_period: 90s
+
   regulatory-ingestion-service:
     image: ${REGULATORY_INGESTION_SERVICE_IMAGE:-ghcr.io/grace-grc/regulatory-ingestion-service}:${REGULATORY_INGESTION_SERVICE_TAG:-latest}
     environment:

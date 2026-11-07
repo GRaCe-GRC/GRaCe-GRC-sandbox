@@ -5,6 +5,9 @@ services:
   control-api:
     image: ${CONTROL_API_LOCAL_IMAGE:-control-api:local}
     pull_policy: never
+  control-mapping-api:
+    image: ${CONTROL_MAPPING_API_LOCAL_IMAGE:-control-mapping-api:local}
+    pull_policy: never
   regulatory-ingestion-service:
     image: ${REGULATORY_INGESTION_SERVICE_LOCAL_IMAGE:-regulatory-ingestion-service:local}
     pull_policy: never
