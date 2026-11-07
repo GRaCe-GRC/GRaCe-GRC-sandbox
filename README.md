@@ -3,7 +3,7 @@
 Local development environment for GRaCe-GRC: one Docker Compose setup with the databases and the
 services.
 
-> **Status:** PostgreSQL, the Regulatory API, the regulatory ingestion service, the admin console service and the admin console UI. No SQS, SNS or S3 yet.
+> **Status:** PostgreSQL, the Regulatory API, the Control API, the regulatory ingestion service, the admin console service and the admin console UI. No SQS, SNS or S3 yet.
 
 ## Layout
 
@@ -17,7 +17,7 @@ services.
 
 ## Prerequisites
 - Docker with Docker Compose v2 (`docker compose version`)
-- Ports `5432`, `8080`, `8081`, `8082` and `4200` free, or other ports set in `compose/.env`
+- Ports `5432`, `8080`, `8081`, `8082`, `8083` and `4200` free, or other ports set in `compose/.env`
 
 ## Start and stop
 Run every command from the `compose` folder:
@@ -37,6 +37,7 @@ docker compose down
 |---|---|---|---|
 | `postgres` | `postgres:18-alpine` | `5432` | |
 | `regulatory-api` | `ghcr.io/grace-grc/regulatory-api` | `8080` | `postgres` (healthy) |
+| `control-api` | `ghcr.io/grace-grc/control-api` | `8083` | `postgres` (healthy); uses schema `controls` of the `controls` database |
 | `regulatory-ingestion-service` | `ghcr.io/grace-grc/regulatory-ingestion-service` | `8081` | `regulatory-api` (healthy), called at `http://regulatory-api:8080` |
 | `admin-console-service` | `ghcr.io/grace-grc/admin-console-service` | `8082` | `regulatory-ingestion-service` (healthy), called at `http://regulatory-ingestion-service:8080` |
 | `admin-console-ui` | `ghcr.io/grace-grc/admin-console-ui` | `4200` | `admin-console-service` (healthy); nginx sends `/api` to `http://admin-console-service:8080` |
@@ -59,6 +60,20 @@ curl http://localhost:8082/api/dashboard/authorities
 ```
 
 It sets `createdBy` to `admin-console` and creates the authority through the ingestion service.
+
+The Control API serves control groups and controls on port `8083`:
+
+```bash
+curl -i -H 'Content-Type: application/json' \
+  -d '{"groupRef":"AC","title":"Access Control","createdBy":"me"}' \
+  http://localhost:8083/api/v1/control-groups
+curl -i -H 'Content-Type: application/json' \
+  -d '{"groupId":"<group id>","controlRef":"AC-2","title":"Account Management","createdBy":"me"}' \
+  http://localhost:8083/api/v1/controls
+curl 'http://localhost:8083/api/v1/controls?groupId=<group id>'
+```
+
+Use the id from the `Location` header of the first request as `<group id>`.
 
 ## Walkthrough
 
@@ -85,7 +100,7 @@ docker compose up -d --wait
 ```
 
 To run a specific release, set the tag in `compose/.env` (for example `REGULATORY_API_TAG=0.1.0` or
-`REGULATORY_INGESTION_SERVICE_TAG=0.1.0`, `ADMIN_CONSOLE_SERVICE_TAG=0.1.0`, `ADMIN_CONSOLE_UI_TAG=0.1.0`).
+`CONTROL_API_TAG=0.1.0`, `REGULATORY_INGESTION_SERVICE_TAG=0.1.0`, `ADMIN_CONSOLE_SERVICE_TAG=0.1.0`, `ADMIN_CONSOLE_UI_TAG=0.1.0`).
 The published Java images are `linux/amd64`; on Apple silicon they run under emulation and start more
 slowly. The UI image is published for `linux/amd64` and `linux/arm64`.
 
@@ -101,12 +116,13 @@ sandbox with the override:
 
 ```bash
 (cd ../../regulatory-api && ./mvnw spring-boot:build-image -Dspring-boot.build-image.imageName=regulatory-api:local)
+(cd ../../control-api && ./mvnw spring-boot:build-image -Dspring-boot.build-image.imageName=control-api:local)
 (cd ../../regulatory-ingestion-service && ./mvnw spring-boot:build-image -Dspring-boot.build-image.imageName=regulatory-ingestion-service:local)
 (cd ../../admin-console-service && ./mvnw spring-boot:build-image -Dspring-boot.build-image.imageName=admin-console-service:local)
 docker compose -f compose.yaml -f compose.build.yaml up -d --wait
 ```
 
-The override only changes the Java services to `regulatory-api:local`, `regulatory-ingestion-service:local`
+The override only changes the Java services to `regulatory-api:local`, `control-api:local`, `regulatory-ingestion-service:local`
 and `admin-console-service:local` and never pulls them, so build them before using it. The UI is built
 by Compose from `../../admin-console-ui` (its `Dockerfile`) as `admin-console-ui:local`:
 
@@ -135,6 +151,10 @@ cp .env.example .env
 | `REGULATORY_API_TAG` | `latest` | Regulatory API image tag |
 | `REGULATORY_API_PORT` | `8080` | Regulatory API port on your machine |
 | `REGULATORY_API_LOCAL_IMAGE` | `regulatory-api:local` | Image used by `compose.build.yaml` |
+| `CONTROL_API_IMAGE` | `ghcr.io/grace-grc/control-api` | Control API image |
+| `CONTROL_API_TAG` | `latest` | Control API image tag |
+| `CONTROL_API_PORT` | `8083` | Control API port on your machine |
+| `CONTROL_API_LOCAL_IMAGE` | `control-api:local` | Image used by `compose.build.yaml` |
 | `REGULATORY_INGESTION_SERVICE_IMAGE` | `ghcr.io/grace-grc/regulatory-ingestion-service` | Ingestion service image |
 | `REGULATORY_INGESTION_SERVICE_TAG` | `latest` | Ingestion service image tag |
 | `REGULATORY_INGESTION_SERVICE_PORT` | `8081` | Ingestion service port on your machine |

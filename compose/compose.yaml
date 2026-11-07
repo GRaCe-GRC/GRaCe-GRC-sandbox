@@ -53,6 +53,30 @@ services:
       retries: 10
       start_period: 90s
 
+  control-api:
+    image: ${CONTROL_API_IMAGE:-ghcr.io/grace-grc/control-api}:${CONTROL_API_TAG:-latest}
+    environment:
+      CONTROL_DB_HOST: postgres
+      CONTROL_DB_PORT: 5432
+      CONTROL_DB_NAME: controls
+      CONTROL_DB_USERNAME: control_api
+      CONTROL_DB_PASSWORD: ${CONTROL_API_DB_PASSWORD:-control_api}
+    ports:
+      - "${CONTROL_API_PORT:-8083}:8080"
+    volumes:
+      - healthcheck-probe:/healthcheck:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      healthcheck-probe:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/layers/paketo-buildpacks_bellsoft-liberica/jre/bin/java", "-cp", "/healthcheck", "HealthCheck", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 30s
+      retries: 10
+      start_period: 90s
+
   regulatory-ingestion-service:
     image: ${REGULATORY_INGESTION_SERVICE_IMAGE:-ghcr.io/grace-grc/regulatory-ingestion-service}:${REGULATORY_INGESTION_SERVICE_TAG:-latest}
     environment:
