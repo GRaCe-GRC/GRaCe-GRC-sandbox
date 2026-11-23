@@ -40,7 +40,7 @@ docker compose down
 | `control-api` | `ghcr.io/grace-grc/control-api` | `8083` | `postgres` (healthy); uses schema `controls` of the `controls` database |
 | `control-mapping-api` | `ghcr.io/grace-grc/control-mapping-api` | `8084` | `postgres` (healthy); uses schema `control_mappings` of the `controls` database |
 | `regulatory-ingestion-service` | `ghcr.io/grace-grc/regulatory-ingestion-service` | `8081` | `regulatory-api` (healthy), called at `http://regulatory-api:8080` |
-| `admin-console-service` | `ghcr.io/grace-grc/admin-console-service` | `8082` | `regulatory-ingestion-service` (healthy), called at `http://regulatory-ingestion-service:8080` |
+| `admin-console-service` | `ghcr.io/grace-grc/admin-console-service` | `8082` | `regulatory-ingestion-service`, `control-api` and `control-mapping-api` (healthy), called at `http://regulatory-ingestion-service:8080`, `http://control-api:8080` and `http://control-mapping-api:8080` |
 | `admin-console-ui` | `ghcr.io/grace-grc/admin-console-ui` | `4200` | `admin-console-service` (healthy); nginx sends `/api` to `http://admin-console-service:8080` |
 
 ```bash
@@ -51,13 +51,16 @@ curl http://localhost:8081/api/v1/authorities
 curl http://localhost:8080/api/v1/authorities
 ```
 
-The admin console service serves the dashboard API on port `8082`:
+The admin console service serves the dashboard API on port `8082`. `GET /api/dashboard` returns
+everything the admin console shows in one call: the authorities with their frameworks, files,
+requirement trees, mapped controls and coverage, and the control library. The service reads the
+ingestion service, control-api and control-mapping-api in parallel to build it.
 
 ```bash
 curl -i -H 'Content-Type: application/json' \
   -d '{"name":"Financial Conduct Authority","jurisdiction":"UK"}' \
   http://localhost:8082/api/dashboard/authorities
-curl http://localhost:8082/api/dashboard/authorities
+curl http://localhost:8082/api/dashboard
 ```
 
 It sets `createdBy` to `admin-console` and creates the authority through the ingestion service.
