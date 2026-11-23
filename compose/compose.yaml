@@ -125,12 +125,18 @@ services:
     image: ${ADMIN_CONSOLE_SERVICE_IMAGE:-ghcr.io/grace-grc/admin-console-service}:${ADMIN_CONSOLE_SERVICE_TAG:-latest}
     environment:
       REGULATORY_INGESTION_SERVICE_URL: http://regulatory-ingestion-service:8080
+      CONTROL_API_URL: http://control-api:8080
+      CONTROL_MAPPING_API_URL: http://control-mapping-api:8080
     ports:
       - "${ADMIN_CONSOLE_SERVICE_PORT:-8082}:8080"
     volumes:
       - healthcheck-probe:/healthcheck:ro
     depends_on:
       regulatory-ingestion-service:
+        condition: service_healthy
+      control-api:
+        condition: service_healthy
+      control-mapping-api:
         condition: service_healthy
       healthcheck-probe:
         condition: service_completed_successfully
